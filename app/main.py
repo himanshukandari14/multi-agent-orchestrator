@@ -14,3 +14,9 @@ if __name__ == "__main__":
 
     print("\n=== OUTPUT ===\n")
     print(result)
+
+    with open("output_patch.txt", "w") as f:
+        f.write(result["patch"] or "")
+    
+    with open("output_tests.txt", "w") as f:
+        f.write(result["tests"] or "")
