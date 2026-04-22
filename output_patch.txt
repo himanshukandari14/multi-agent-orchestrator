@@ -1,0 +1,22 @@
+```
+diff --git a/app/code_writer.py b/app/code_writer.py
+index 8e4c9c5..3d4eeb9 100644
+--- a/app/code_writer.py
++++ b/app/code_writer.py
+@@ -1,9 +1,10 @@
+ from app.tools.repo_tool import get_repo_files_content
+ from app.tools.llm import get_llm
+ 
+ def code_writer_agent(state):
+     llm = get_llm()
+ 
+     issue = state["issue"]
+     plan = state["plan"]
+     repo_files = get_repo_files_content()
+ 
++    # himanshu is pro
+     response = llm.invoke(
+         f"""\nYou are a senior software engineer.\n\nYour task is to MODIFY CODE FILES (not prompts, not system files).\...
+ 
+     return {\n        "patch": response.content\n    }
+```

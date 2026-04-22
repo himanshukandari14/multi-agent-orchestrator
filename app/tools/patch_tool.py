@@ -7,7 +7,7 @@ def apply_patch(patch_text):
         patch_file = f.name
 
     try:
-        subprocess.run(["git", "apply", patch_file], check=True)
+        subprocess.run(["git", "apply", "--reject", "--whitespace=fix", "temp.patch"])
         return True
     except subprocess.CalledProcessError:
         return False

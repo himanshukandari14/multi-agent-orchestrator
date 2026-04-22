@@ -1,0 +1,102 @@
+To verify the fix for the bug related to writing a comment in the code, we need to write a series of unit tests to ensure that our modifications are functioning correctly. Here are some practical test cases, including unit tests, edge cases, and failure scenarios.
+
+### Unit Tests
+
+1. **Test Comment Addition**
+   - Ensure that the comment `# himanshu is pro` is correctly added to the code.
+   
+   ```python
+   import unittest
+
+   class TestCodeWriterAgent(unittest.TestCase):
+
+       def setUp(self):
+           self.state = {
+               "issue": "Fix bug: write a comment - himanshu is pro",
+               "plan": "Add comment to the code."
+           }
+
+       def test_comment_added(self):
+           output = code_writer_agent(self.state)
+           self.assertIn("# himanshu is pro", output['patch'])
+
+   if __name__ == "__main__":
+       unittest.main()
+   ```
+
+2. **Test Correctness of LLM Response**
+   - Ensure that the code modification returned by the LLM successfully modifies the code files.
+   
+   ```python
+   def test_llm_response_structure(self):
+       output = code_writer_agent(self.state)
+       self.assertIn('patch', output)
+       self.assertIsInstance(output['patch'], str)
+   ```
+
+### Edge Cases
+
+3. **Test Empty State**
+   - Ensure that if the state is empty or missing keys, the function returns an appropriate response.
+
+   ```python
+   def test_empty_state(self):
+       with self.assertRaises(KeyError):
+           code_writer_agent({})
+   ```
+
+4. **Test Missing Issue**
+   - Ensure the function can handle a situation where the "issue" key is missing in the state.
+
+   ```python
+   def test_missing_issue(self):
+       state = {"plan": "Add comment to the code."}
+       with self.assertRaises(KeyError):
+           code_writer_agent(state)
+   ```
+
+5. **Test Long Issue Description**
+   - Input a long issue description to see how the function handles it.
+
+   ```python
+   def test_long_issue_description(self):
+       long_issue = "Fix bug: " + "a"*500  # Simulating a very long issue description
+       self.state["issue"] = long_issue
+       output = code_writer_agent(self.state)
+       self.assertIn("# himanshu is pro", output['patch'])
+   ```
+
+### Failure Scenarios
+
+6. **Test Unreachable LLM Service**
+   - Simulate a scenario where the LLM service is unreachable or unresponsive.
+
+   ```python
+   from unittest.mock import patch
+
+   @patch('app.tools.llm.get_llm')
+   def test_llm_service_unreachable(mock_get_llm):
+       mock_get_llm.return_value.invoke.side_effect = Exception("Service Unreachable")
+       with self.assertRaises(Exception) as context:
+           code_writer_agent(self.state)
+       self.assertTrue('Service Unreachable' in str(context.exception))
+   ```
+
+7. **Test Unexpected LLM Response Format**
+   - Ensure the agent can handle an unexpected response from the LLM (e.g., missing 'content').
+
+   ```python
+   @patch('app.tools.llm.get_llm')
+   def test_unexpected_response_format(mock_get_llm):
+       class DummyLLM:
+           def invoke(self, prompt):
+               return {}  # No 'content' key
+
+       mock_get_llm.return_value = DummyLLM()
+       with self.assertRaises(KeyError):
+           code_writer_agent(self.state)
+   ```
+
+### Summary
+
+These test cases cover the functionality introduced with the comment addition, edge cases involving the handling of unexpected or extreme input, and failure scenarios for robustness. When implemented in a test suite, these cases will help to ensure that the code operates as intended across a variety of conditions.

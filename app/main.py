@@ -4,7 +4,7 @@ if __name__ == "__main__":
     graph = build_graph()
 
     result = graph.invoke({
-        "issue": "Fix bug: add my name- himanshukandari on website",
+        "issue": "Fix bug: write a comment - himanshu is pro",
         "code_context": None,
         "plan": None,
         "patch": None,

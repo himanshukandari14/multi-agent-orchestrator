@@ -10,27 +10,38 @@ def code_writer_agent(state):
 
 
     response = llm.invoke(
-        f"""
-        You are a senior software engineer working on a REAL codebase.
+    f"""
+You are a senior software engineer.
 
-        Issue:
-        {issue}
+Your task is to MODIFY CODE FILES (not prompts, not system files).
 
-        Plan:
-        {plan}
+Issue:
+{issue}
 
-        Here are actual files from the repo:
-        {repo_files}
+Plan:
+{plan}
 
-        IMPORTANT:
-        - ONLY modify existing files
-        - Use exact file paths from above
-        - DO NOT hallucinate files
-        - Generate valid git diff patch
+Repo files:
+{repo_files}
 
-        Output ONLY diff.
-        """
-    )
+CRITICAL RULES:
+- Only modify actual application files (like main.py, routes, UI files)
+- NEVER modify:
+  - app/agents/*
+  - app/tools/*
+  - prompt strings
+- If task says "add comment", it means:
+  → Add a Python comment (# ...) inside a code file
+
+OUTPUT RULES:
+- Output ONLY raw git diff
+- No explanation
+- No markdown
+- Must start with: diff --git
+
+If no valid file found → output: NO_CHANGES
+"""
+)
 
     return {
         "patch": response.content
