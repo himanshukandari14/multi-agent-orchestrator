@@ -1,3 +1,4 @@
+from app.tools.repo_tool import get_repo_files_content
 from app.tools.llm import get_llm
 
 def code_writer_agent(state):
@@ -5,23 +6,29 @@ def code_writer_agent(state):
 
     issue = state["issue"]
     plan = state["plan"]
+    repo_files = get_repo_files_content()
 
 
     response = llm.invoke(
         f"""
-        You are a senior software engineer.
+        You are a senior software engineer working on a REAL codebase.
 
-        Given this issue:
+        Issue:
         {issue}
 
-        And this plan:
+        Plan:
         {plan}
 
-        Write the actual code fix.
+        Here are actual files from the repo:
+        {repo_files}
 
-        - Provide code snippets
-        - Mention file names
-        - Keep it practical
+        IMPORTANT:
+        - ONLY modify existing files
+        - Use exact file paths from above
+        - DO NOT hallucinate files
+        - Generate valid git diff patch
+
+        Output ONLY diff.
         """
     )
 

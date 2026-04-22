@@ -4,7 +4,7 @@ if __name__ == "__main__":
     graph = build_graph()
 
     result = graph.invoke({
-        "issue": "Fix bug: user cannot upload profile image",
+        "issue": "Fix bug: add my name- himanshukandari on website",
         "code_context": None,
         "plan": None,
         "patch": None,
