@@ -117,7 +117,7 @@ def pr_agent(state):
         title="AI Fix (Auto Generated)",
         body="This PR was created automatically by the AI agent.",
         head=branch_name,
-        base="main"
+        base=repo.default_branch
     )
 
     return {

@@ -1,13 +1,23 @@
 import subprocess
 import tempfile
 
-def apply_patch(patch_text):
-    with tempfile.NamedTemporaryFile(delete=False, mode="w") as f:
-        f.write(patch_text)
-        patch_file = f.name
-
+def apply_patch(patch: str):
     try:
-        subprocess.run(["git", "apply", "--reject", "--whitespace=fix", "temp.patch"])
+        with open("temp.patch", "w") as f:
+            f.write(patch)
+
+        result = subprocess.run(
+            ["git", "apply", "--whitespace=fix", "temp.patch"],
+            capture_output=True,
+            text=True
+        )
+
+        if result.returncode != 0:
+            print("PATCH ERROR:", result.stderr)
+            return False
+
         return True
-    except subprocess.CalledProcessError:
+
+    except Exception as e:
+        print("EXCEPTION:", str(e))
         return False
