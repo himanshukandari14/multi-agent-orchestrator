@@ -1,6 +1,6 @@
+import os
 import re
 import subprocess
-import tempfile
 
 _HUNK_HEADER = re.compile(
     r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$"
@@ -14,6 +14,7 @@ def _is_hunk_body_line(line: str) -> bool:
 
 
 def _count_hunk_lines(body: list[str]) -> tuple[int, int]:
+    """Return (old_line_count, new_line_count) for a unified-diff hunk body."""
     old_n, new_n = 0, 0
     for line in body:
         if not line:
@@ -34,6 +35,11 @@ def _count_hunk_lines(body: list[str]) -> tuple[int, int]:
 
 
 def repair_unified_diff_hunks(patch: str) -> str:
+    """
+    Rewrite @@ hunk headers so old/new line counts match the following body.
+    LLM-generated diffs often declare the wrong count; git then errors with
+    'corrupt patch at line N' when an extra '+' line sits past the header.
+    """
     text = patch.replace("\r\n", "\n").replace("\r", "\n")
     lines = text.split("\n")
     out: list[str] = []
@@ -89,27 +95,44 @@ def prepare_patch_for_git_apply(patch: str) -> str:
     return repair_unified_diff_hunks(patch)
 
 
-def apply_patch(patch_text):
-    patch_text = prepare_patch_for_git_apply(patch_text)
-    with tempfile.NamedTemporaryFile(
-        mode="w", delete=False, suffix=".patch", encoding="utf-8", newline="\n"
-    ) as f:
-        f.write(patch_text)
-        if not patch_text.endswith("\n"):
-            f.write("\n")
-        patch_file = f.name
-
+def apply_patch(patch: str):
     try:
-        subprocess.run(
+        patch = prepare_patch_for_git_apply(patch)
+        with open("temp.patch", "w", encoding="utf-8", newline="\n") as f:
+            f.write(patch)
+            if not patch.endswith("\n"):
+                f.write("\n")
+
+        result = subprocess.run(
             [
                 "git",
                 "apply",
                 "--recount",
                 "--whitespace=fix",
-                patch_file,
+                "temp.patch",
             ],
-            check=True,
+            capture_output=True,
+            text=True,
         )
+
+        if result.returncode != 0:
+            print("PATCH ERROR:", (result.stderr or "").strip() or result.stdout)
+            try:
+                os.remove("temp.patch")
+            except OSError:
+                pass
+            return False
+
+        try:
+            os.remove("temp.patch")
+        except OSError:
+            pass
         return True
-    except subprocess.CalledProcessError:
+
+    except Exception as e:
+        print("EXCEPTION:", str(e))
+        try:
+            os.remove("temp.patch")
+        except OSError:
+            pass
         return False
