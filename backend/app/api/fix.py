@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import get_current_user
+from app.db import models
 from app.db.session import get_db
 from app.queue.redis import queue, redis_conn
 from app.services.fix_job_db import (
@@ -18,6 +20,7 @@ from app.services.fix_job_db import (
 from app.services.job_runner import run_job
 from app.utils.job_tracker import create_job
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -65,6 +68,25 @@ def list_my_fix_jobs(
     return [_row_to_list_item(r) for r in jobs]
 
 
+def _delete_redis_job_key(job_id: str) -> None:
+    try:
+        redis_conn.delete(job_id)
+    except Exception:
+        logger.exception("redis delete for job %s", job_id)
+
+
+def _delete_fix_job_row(db: Session, job_id: str) -> None:
+    row = db.get(models.FixJob, job_id)
+    if row is None:
+        return
+    try:
+        db.delete(row)
+        db.commit()
+    except Exception:
+        logger.exception("db delete FixJob %s", job_id)
+        db.rollback()
+
+
 @router.post("/fix")
 def fix_issue(
     data: FixIssueBody,
@@ -73,7 +95,16 @@ def fix_issue(
 ) -> dict[str, str]:
     job_id = str(uuid.uuid4())
     user_id = uuid.UUID(user["user_id"])
-    create_job(job_id)
+
+    try:
+        create_job(job_id)
+    except Exception as e:
+        logger.exception("create_job (redis) failed")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Queue storage unavailable. Check REDIS_URL. ({e!s})",
+        ) from e
+
     try:
         create_fix_job(
             db,
@@ -84,24 +115,37 @@ def fix_issue(
             issue_id=data.issue_id,
             repo_label=data.repo_label,
         )
-    except Exception:
-        try:
-            redis_conn.delete(job_id)
-        except Exception:
-            pass
+    except Exception as e:
+        logger.exception("create_fix_job failed")
+        _delete_redis_job_key(job_id)
         raise HTTPException(
-            status_code=500, detail="Could not create job record"
-        ) from None
+            status_code=500,
+            detail=(
+                "Could not create job record. "
+                "If you recently deployed, run a DB migration or restart the API so "
+                "`fix_jobs` exists (create_all on startup). "
+                f"Reason: {e!s}"
+            ),
+        ) from e
 
-    queue.enqueue(
-        run_job,
-        {
-            "job_id": job_id,
-            "repo_url": data.repo_url,
-            "issue": data.issue,
-            "github_token": user["github_token"],
-        },
-    )
+    try:
+        queue.enqueue(
+            run_job,
+            {
+                "job_id": job_id,
+                "repo_url": data.repo_url,
+                "issue": data.issue,
+                "github_token": user["github_token"],
+            },
+        )
+    except Exception as e:
+        logger.exception("queue.enqueue failed")
+        _delete_redis_job_key(job_id)
+        _delete_fix_job_row(db, job_id)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not enqueue job. Is Redis up and correct? ({e!s})",
+        ) from e
 
     return {
         "job_id": job_id,
