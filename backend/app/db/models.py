@@ -129,7 +129,7 @@ class FixJob(Base):
     )
     repo_url: Mapped[str] = mapped_column(Text)
     issue_title: Mapped[str] = mapped_column(String(2000))
-    issue_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    issue_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
     repo_label: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     status: Mapped[str] = mapped_column(
         String(32), default="pending", index=True
