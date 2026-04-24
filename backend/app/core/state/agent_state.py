@@ -9,3 +9,4 @@ class AgentState(TypedDict):
     patch: Optional[str]
     tests: Optional[str]
     pr_url: Optional[str]
+    error: Optional[str]

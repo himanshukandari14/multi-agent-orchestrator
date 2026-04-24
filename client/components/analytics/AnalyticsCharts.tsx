@@ -22,31 +22,46 @@ const TOOLTIP_STYLE = {
   color: "#f4f4f5",
 };
 
-/** Placeholder time series (replace with API). */
-const weeklyFixes = [
-  { label: "Mon", fixes: 3 },
-  { label: "Tue", fixes: 5 },
-  { label: "Wed", fixes: 4 },
-  { label: "Thu", fixes: 7 },
-  { label: "Fri", fixes: 6 },
-  { label: "Sat", fixes: 2 },
-  { label: "Sun", fixes: 4 },
-];
+export type AnalyticsChartsProps = {
+  last7Days: Array<{ label: string; completed: number }>;
+  outcomes: { completed: number; failed: number; in_progress: number };
+  loading: boolean;
+};
 
-const byOutcome = [
-  { name: "Completed", n: 38 },
-  { name: "Failed", n: 3 },
-  { name: "In progress", n: 6 },
-];
+export function AnalyticsCharts({
+  last7Days,
+  outcomes,
+  loading,
+}: AnalyticsChartsProps) {
+  const weeklyFixes = last7Days.map((d) => ({
+    label: d.label,
+    fixes: d.completed,
+  }));
 
-export function AnalyticsCharts() {
+  const byOutcome = [
+    { name: "Completed", n: outcomes.completed },
+    { name: "Failed", n: outcomes.failed },
+    { name: "In progress", n: outcomes.in_progress },
+  ];
+
+  if (loading) {
+    return (
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
+        <div className="h-72 min-h-64 animate-pulse rounded-xl border border-border/60 bg-surface-elevated/20" />
+        <div className="h-72 min-h-64 animate-pulse rounded-xl border border-border/60 bg-surface-elevated/20" />
+      </div>
+    );
+  }
+
   return (
     <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-2">
       <div className="rounded-xl border border-border/80 bg-surface-elevated/30 p-4 sm:p-5">
         <h3 className="mb-1 font-heading text-base font-semibold text-foreground">
-          Fixes per day
+          Completions per day
         </h3>
-        <p className="mb-4 text-xs text-muted">Last 7 days (sample)</p>
+        <p className="mb-4 text-xs text-muted">
+          Last 7 days (UTC) — completed fix jobs
+        </p>
         <div className="h-64 w-full min-h-64 min-w-0 sm:h-72 sm:min-h-72">
           <ResponsiveContainer width="100%" height="100%" minHeight={256}>
             <AreaChart
@@ -77,7 +92,7 @@ export function AnalyticsCharts() {
               <Area
                 type="monotone"
                 dataKey="fixes"
-                name="Fixes"
+                name="Completed"
                 stroke="#e11d48"
                 strokeWidth={2}
                 fill="url(#fixGrad)"
@@ -91,7 +106,9 @@ export function AnalyticsCharts() {
         <h3 className="mb-1 font-heading text-base font-semibold text-foreground">
           Outcomes
         </h3>
-        <p className="mb-4 text-xs text-muted">Session snapshot (sample)</p>
+        <p className="mb-4 text-xs text-muted">
+          All time — your account
+        </p>
         <div className="h-64 w-full min-h-64 min-w-0 sm:h-72 sm:min-h-72">
           <ResponsiveContainer width="100%" height="100%" minHeight={256}>
             <BarChart
@@ -105,7 +122,12 @@ export function AnalyticsCharts() {
                 horizontal
                 vertical={false}
               />
-              <XAxis type="number" tick={tick} axisLine={false} tickLine={false} />
+              <XAxis
+                type="number"
+                tick={tick}
+                axisLine={false}
+                tickLine={false}
+              />
               <YAxis
                 type="category"
                 dataKey="name"
@@ -115,7 +137,12 @@ export function AnalyticsCharts() {
                 width={88}
               />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Bar dataKey="n" name="Count" fill="#e11d48" radius={[0, 4, 4, 0]} />
+              <Bar
+                dataKey="n"
+                name="Count"
+                fill="#e11d48"
+                radius={[0, 4, 4, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>

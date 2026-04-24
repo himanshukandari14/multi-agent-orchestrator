@@ -1,17 +1,15 @@
 "use client";
 
 import type { ComponentType } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useJobQueue } from "@/context/JobQueueContext";
 import { useCaptureOAuthToken } from "@/hooks/useCaptureOAuthToken";
-
-/** Placeholder until analytics / DB; swap for real aggregates. */
-const HARDCODED_METRICS = {
-  lifetimeFixesCompleted: 47,
-  successRatePct: 94,
-  failedRuns: 3,
-  medianTimeToPr: "4m 12s",
-} as const;
+import {
+  type FixMetrics,
+  fetchFixMetrics,
+  formatMedianSeconds,
+} from "@/lib/fixMetrics";
 
 function IconCheckCircle({ className }: { className?: string }) {
   return (
@@ -167,56 +165,120 @@ function StatCard({
   );
 }
 
-export default function Dashboard() {
-  useCaptureOAuthToken();
-  const { activeCount, jobs } = useJobQueue();
-  const completedInSession = jobs.filter((j) => j.status === "completed")
-    .length;
-
-  const staticStats: StatConfig[] = [
+function metricsToStatCards(
+  m: FixMetrics,
+  completedInSession: number,
+  loading: boolean,
+): StatConfig[] {
+  const success =
+    m.success_rate_last_30d_pct == null
+      ? loading
+        ? "…"
+        : "—"
+      : `${m.success_rate_last_30d_pct}%`;
+  return [
     {
       label: "Lifetime fixes (completed)",
-      value: String(HARDCODED_METRICS.lifetimeFixesCompleted),
-      hint: "All-time successful runs (illustrative)",
+      value: loading ? "…" : String(m.completed_total),
+      hint: "All successful runs in your account",
       Icon: IconCheckCircle,
       delay: "0ms",
     },
     {
-      label: "Success rate",
-      value: `${HARDCODED_METRICS.successRatePct}%`,
-      hint: "Last 30d rolling (illustrative)",
+      label: "Success rate (30d)",
+      value: success,
+      hint: "Completed vs failed in the last 30 days",
       Icon: IconPercent,
       delay: "40ms",
     },
     {
-      label: "Failed runs",
-      value: String(HARDCODED_METRICS.failedRuns),
-      hint: "Requires manual follow-up (illustrative)",
+      label: "Failed runs (all time)",
+      value: loading ? "…" : String(m.failed_total),
+      hint: "Failed fix jobs in your account",
       Icon: IconAlert,
       delay: "80ms",
     },
     {
-      label: "Median time to PR",
-      value: HARDCODED_METRICS.medianTimeToPr,
-      hint: "Queue to open PR (illustrative)",
+      label: "Median time to complete",
+      value: loading
+        ? "…"
+        : formatMedianSeconds(m.median_seconds_to_complete),
+      hint: "Median wall time for completed jobs",
       Icon: IconClock,
       delay: "120ms",
     },
     {
       label: "Active in queue",
-      value: String(activeCount),
-      hint: "Jobs queued, running, or waiting",
+      value: loading ? "…" : String(m.in_progress),
+      hint: "Queued, waiting, or running (your account, any device)",
       Icon: IconPulse,
       delay: "160ms",
     },
     {
       label: "Completed (this session)",
       value: String(completedInSession),
-      hint: "Finished jobs in this tab since load",
+      hint: "Finished in this tab since you opened the app",
       Icon: IconSession,
       delay: "200ms",
     },
   ];
+}
+
+const EMPTY_METRICS: FixMetrics = {
+  completed_total: 0,
+  failed_total: 0,
+  in_progress: 0,
+  completed_last_30d: 0,
+  failed_last_30d: 0,
+  success_rate_last_30d_pct: null,
+  median_seconds_to_complete: null,
+  last_7_days: [],
+  outcomes: { completed: 0, failed: 0, in_progress: 0 },
+};
+
+export default function Dashboard() {
+  useCaptureOAuthToken();
+  const { jobs } = useJobQueue();
+  const completedInSession = jobs.filter((j) => j.status === "completed")
+    .length;
+
+  const [metrics, setMetrics] = useState<FixMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+
+  const loadMetrics = useCallback(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setMetrics(null);
+      setMetricsLoading(false);
+      return;
+    }
+    setMetricsLoading(true);
+    void (async () => {
+      setMetricsError(null);
+      try {
+        const data = await fetchFixMetrics(token);
+        setMetrics(data);
+      } catch (e) {
+        setMetricsError(
+          e instanceof Error ? e.message : "Failed to load metrics",
+        );
+        setMetrics(null);
+      } finally {
+        setMetricsLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    loadMetrics();
+  }, [loadMetrics]);
+
+  const staticStats: StatConfig[] = metricsToStatCards(
+    metrics ?? EMPTY_METRICS,
+    completedInSession,
+    metricsLoading,
+  );
 
   return (
     <div className="space-y-8">
@@ -250,10 +312,14 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <p className="rounded-md border border-border/50 bg-surface-elevated/40 px-3 py-2 text-xs text-muted">
-        Sample values below until a database is connected. Queue counts use this
-        session’s Activity state.
-      </p>
+      {metricsError && (
+        <p
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90"
+          role="alert"
+        >
+          {metricsError}
+        </p>
+      )}
 
       <section aria-labelledby="metrics-heading" className="space-y-3">
         <h2

@@ -46,15 +46,18 @@ def run_job(data):
 
         graph = build_graph()
 
-        result = graph.invoke({
-            "issue": issue,
-            "repo_url": repo_url,
-            "code_context": None,
-            "plan": None,
-            "patch": None,
-            "tests": None,
-            "pr_url": None,
-        })
+        result = graph.invoke(
+            {
+                "issue": issue,
+                "repo_url": repo_url,
+                "code_context": None,
+                "plan": None,
+                "patch": None,
+                "tests": None,
+                "pr_url": None,
+                "error": None,
+            }
+        )
 
         update_job(job_id, progress=80, message="Finalizing PR...")
 
@@ -67,17 +70,40 @@ def run_job(data):
             with open("output_tests.txt", "w") as f:
                 f.write(result["tests"])
 
-        update_job(
-            job_id,
-            status="completed",
-            progress=100,
-            result={
-                "pr_url": result.get("pr_url"),
-                "message": "PR created successfully"
-            }
-        )
+        err = result.get("error")
+        if err:
+            update_job(
+                job_id,
+                status="failed",
+                progress=100,
+                result={
+                    "pr_url": result.get("pr_url"),
+                    "error": str(err),
+                },
+            )
+            print("\n❌ Job failed (agent):", str(err))
+            return result
 
-        print("✅ Job completed")
+        if result.get("pr_url"):
+            update_job(
+                job_id,
+                status="completed",
+                progress=100,
+                result={"pr_url": result["pr_url"], "message": "PR created successfully"},
+            )
+            print("✅ Job completed (PR opened)")
+        else:
+            update_job(
+                job_id,
+                status="completed",
+                progress=100,
+                result={
+                    "pr_url": None,
+                    "message": "No pull request: no applicable changes, or the run finished without a PR URL.",
+                },
+            )
+            print("✅ Job completed (no PR)")
+
         return result
 
     except Exception as e:

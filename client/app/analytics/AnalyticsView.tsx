@@ -1,6 +1,11 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import {
+  type FixMetrics,
+  fetchFixMetrics,
+} from "@/lib/fixMetrics";
 
 const AnalyticsCharts = dynamic(
   () =>
@@ -18,7 +23,62 @@ const AnalyticsCharts = dynamic(
   },
 );
 
+const EMPTY: Pick<FixMetrics, "last_7_days" | "outcomes"> = {
+  last_7_days: [],
+  outcomes: { completed: 0, failed: 0, in_progress: 0 },
+};
+
+function defaultLast7Days(): Array<{ label: string; completed: number }> {
+  const rows: Array<{ label: string; completed: number }> = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    rows.push({
+      label: `${d.getUTCMonth() + 1}/${d.getUTCDate()}`,
+      completed: 0,
+    });
+  }
+  return rows;
+}
+
 export function AnalyticsView() {
+  const [data, setData] = useState<FixMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setData(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    void (async () => {
+      setError(null);
+      try {
+        setData(await fetchFixMetrics(token));
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Failed to load analytics",
+        );
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const last7 =
+    data?.last_7_days && data.last_7_days.length > 0
+      ? data.last_7_days
+      : defaultLast7Days();
+  const out = data?.outcomes ?? EMPTY.outcomes;
+
   return (
     <div className="space-y-8">
       <header className="space-y-1">
@@ -29,11 +89,25 @@ export function AnalyticsView() {
           Analytics
         </h1>
         <p className="text-sm text-muted">
-          Charts use illustrative data until a database backs this view.
+          Data comes from your account’s fix history on the server (sign in
+          required).
         </p>
       </header>
 
-      <AnalyticsCharts />
+      {error && (
+        <p
+          className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200/90"
+          role="alert"
+        >
+          {error}
+        </p>
+      )}
+
+      <AnalyticsCharts
+        last7Days={last7}
+        outcomes={out}
+        loading={loading}
+      />
     </div>
   );
 }

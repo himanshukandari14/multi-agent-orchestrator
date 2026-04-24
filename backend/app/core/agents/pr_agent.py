@@ -103,7 +103,7 @@ def pr_agent(state):
     if patch == "NO_CHANGES" or patch == "":
         return {
             "pr_url": None,
-            "message": "No valid changes required"
+            "error": None,
         }
 
     # 🛑 STEP 3: Validate format
@@ -137,7 +137,10 @@ def pr_agent(state):
     if not success:
         return {
             "pr_url": None,
-            "error": "Patch_failed"
+            "error": (
+                "Git could not apply the generated patch. "
+                "The repo on disk may differ from what the model expected (e.g. README or line endings)."
+            ),
         }
 
     # 🔥 STEP 6: GitHub setup (repo from job repo_url; optional GITHUB_REPO fallback)
@@ -201,7 +204,7 @@ def pr_agent(state):
                 head=head,
                 base=base_branch,
             )
-            return {"pr_url": pr.html_url}
+            return {"pr_url": pr.html_url, "error": None}
         except Exception as e:
             last_err = e
             continue
