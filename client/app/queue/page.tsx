@@ -87,8 +87,10 @@ export default function ActivityPage() {
           <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <p className="max-w-2xl text-pretty text-sm text-muted">
               Every <span className="text-foreground">Run fix</span> is queued
-              here. Live status updates; successful runs clear after a few
-              seconds.
+              here. Your recent runs are loaded from the server when you open
+              Activity (any device); this browser also keeps a copy for
+              off-line polish. Live status is polled; completed cards
+              auto-hide a few seconds after they finish in this session.
             </p>
             {isPolling && (
               <p className="shrink-0 text-[11px] font-mono text-accent/90">

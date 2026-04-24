@@ -115,6 +115,36 @@ class User(Base):
         "CreditLedger", back_populates="user"
     )
     payments: Mapped[list["Payment"]] = relationship("Payment", back_populates="user")
+    fix_jobs: Mapped[list["FixJob"]] = relationship("FixJob", back_populates="user")
+
+
+class FixJob(Base):
+    """Durable record for issue-fix runs; live status can still be in Redis (worker)."""
+
+    __tablename__ = "fix_jobs"
+
+    job_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    repo_url: Mapped[str] = mapped_column(Text)
+    issue_title: Mapped[str] = mapped_column(String(2000))
+    issue_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    repo_label: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(32), default="pending", index=True
+    )  # pending, processing, completed, failed, queued
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    result: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="fix_jobs")
 
 
 class Subscription(Base):

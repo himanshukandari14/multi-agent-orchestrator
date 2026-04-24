@@ -48,6 +48,8 @@ const JobQueueContext = createContext<Ctx | null>(null);
 
 const POLL_MS = 2000;
 const AUTO_DISMISS_SUCCESS_MS = 12_000;
+/** Survives full page refresh; bump if QueueJob shape changes. */
+const JOB_QUEUE_STORAGE_KEY = "mao-job-queue-v1";
 
 function mapStatus(s: string): QueueJob["status"] {
   if (s === "pending" || s === "processing") return s;
@@ -68,8 +70,84 @@ function isJobTerminal(s: QueueJob["status"]) {
   return terminal.includes(s);
 }
 
+function isQueueJobArray(x: unknown): x is QueueJob[] {
+  return (
+    Array.isArray(x) &&
+    x.every(
+      (j) =>
+        j &&
+        typeof j === "object" &&
+        "clientId" in j &&
+        typeof (j as QueueJob).clientId === "string",
+    )
+  );
+}
+
+/** Durable jobs from `GET /fix/jobs` (see backend). */
+type ServerFixJobRow = {
+  job_id: string;
+  status: string;
+  progress: number;
+  message: string;
+  result: { pr_url?: string; error?: string } | null;
+  repo_url: string;
+  issue_title: string;
+  issue_id: number | null;
+  repo_label: string | null;
+  created_at: string | null;
+};
+
+function serverRowToQueueJob(s: ServerFixJobRow): QueueJob {
+  const st = mapStatus(s.status);
+  const r = s.result;
+  let prUrl: string | undefined;
+  let err: string | undefined;
+  if (r && typeof r === "object") {
+    if (typeof r.error === "string") err = r.error;
+    if (typeof r.pr_url === "string") prUrl = r.pr_url;
+  }
+  return {
+    clientId: s.job_id,
+    serverJobId: s.job_id,
+    issueId: s.issue_id ?? 0,
+    issueTitle: s.issue_title,
+    repoLabel: s.repo_label ?? "",
+    status: st,
+    createdAt: s.created_at ? new Date(s.created_at).getTime() : Date.now(),
+    lastPolled: Date.now(),
+    progress: s.progress,
+    message: s.message || "",
+    prUrl,
+    error: err,
+  };
+}
+
+function mergeQueueWithServer(
+  prev: QueueJob[],
+  server: ServerFixJobRow[],
+): QueueJob[] {
+  const merged = new Map<string, QueueJob>();
+  for (const r of server) {
+    merged.set(r.job_id, serverRowToQueueJob(r));
+  }
+  for (const j of prev) {
+    if (j.serverJobId) {
+      if (merged.has(j.serverJobId)) {
+        continue;
+      }
+      merged.set(j.clientId, j);
+    } else {
+      merged.set(j.clientId, j);
+    }
+  }
+  return Array.from(merged.values()).sort(
+    (a, b) => b.createdAt - a.createdAt,
+  );
+}
+
 export function JobQueueProvider({ children }: { children: React.ReactNode }) {
   const [jobs, setJobs] = useState<QueueJob[]>([]);
+  const [hydratedFromStorage, setHydratedFromStorage] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const jobsRef = useRef<QueueJob[]>([]);
@@ -78,6 +156,11 @@ export function JobQueueProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     jobsRef.current = jobs;
   }, [jobs]);
+
+  const scheduleAutoDismissRef = useRef<
+    ((clientId: string) => void) | null
+  >(null);
+
   const completedToastShownRef = useRef(new Set<string>());
 
   const showToast = useCallback((message: string) => {
@@ -116,6 +199,68 @@ export function JobQueueProvider({ children }: { children: React.ReactNode }) {
     },
     [],
   );
+
+  useEffect(() => {
+    scheduleAutoDismissRef.current = scheduleAutoDismiss;
+  }, [scheduleAutoDismiss]);
+
+  useEffect(() => {
+    const finish = () =>
+      queueMicrotask(() => setHydratedFromStorage(true));
+    try {
+      const raw = localStorage.getItem(JOB_QUEUE_STORAGE_KEY);
+      if (!raw) {
+        finish();
+        return;
+      }
+      const parsed: unknown = JSON.parse(raw);
+      if (!isQueueJobArray(parsed)) {
+        finish();
+        return;
+      }
+      queueMicrotask(() => {
+        setJobs(parsed);
+        for (const j of parsed) {
+          if (j.status === "completed") {
+            scheduleAutoDismissRef.current?.(j.clientId);
+          }
+        }
+        finish();
+      });
+      return;
+    } catch {
+      /* ignore corrupt storage */
+    }
+    finish();
+  }, []);
+
+  useEffect(() => {
+    if (!hydratedFromStorage || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(JOB_QUEUE_STORAGE_KEY, JSON.stringify(jobs));
+    } catch {
+      /* quota / private mode */
+    }
+  }, [jobs, hydratedFromStorage]);
+
+  useEffect(() => {
+    if (!hydratedFromStorage) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    void (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/fix/jobs?limit=50`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!r.ok) return;
+        const rows = (await r.json()) as unknown;
+        if (!Array.isArray(rows)) return;
+        setJobs((prev) => mergeQueueWithServer(prev, rows as ServerFixJobRow[]));
+      } catch {
+        /* offline / CORS */
+      }
+    })();
+  }, [hydratedFromStorage]);
 
   const processPollResult = useCallback(
     (clientId: string, res: Record<string, unknown>) => {
@@ -199,6 +344,15 @@ export function JobQueueProvider({ children }: { children: React.ReactNode }) {
               const r = await fetch(`${API_BASE}/jobs/${j.serverJobId}`, {
                 headers: token ? { Authorization: `Bearer ${token}` } : {},
               });
+              if (r.status === 404) {
+                updateJob(j.clientId, {
+                  status: "failed",
+                  error: "Job not found or no access.",
+                  lastPolled: Date.now(),
+                });
+                continue;
+              }
+              if (r.status === 401) continue;
               if (!r.ok) continue;
               const data = (await r.json()) as Record<string, unknown>;
               const st = "status" in data ? String(data.status) : "unknown";
@@ -283,6 +437,8 @@ export function JobQueueProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({
             repo_url: input.repoUrl,
             issue: input.issueTitle,
+            issue_id: input.issueId,
+            repo_label: input.repoLabel,
           }),
         });
         const data = (await res.json()) as { job_id?: string };
