@@ -1,9 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AccountMenu } from "@/components/AccountMenu";
 import { useJobQueue } from "@/context/JobQueueContext";
+import {
+  getSessionCookieToken,
+  setSessionCookie,
+} from "@/lib/sessionCookie";
 
 const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: IconGrid },
@@ -206,7 +211,30 @@ function MainNavItem({
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { activeCount } = useJobQueue();
+  const syncedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || syncedRef.current) return;
+    try {
+      const ls = localStorage.getItem("token");
+      const ck = getSessionCookieToken();
+      if (ls && !ck) {
+        setSessionCookie(ls);
+        syncedRef.current = true;
+        router.refresh();
+        return;
+      }
+      if (ck && !ls) {
+        localStorage.setItem("token", ck);
+        syncedRef.current = true;
+        return;
+      }
+    } catch {
+      // ignore
+    }
+  }, [router, pathname]);
 
   return (
     <div className="flex min-h-dvh w-full max-w-full flex-col bg-background lg:flex-row">
@@ -260,9 +288,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
           <Link
-            href="/"
+            href="/dashboard"
             className="group flex min-w-0 items-baseline gap-0.5 font-heading text-[16px] font-semibold tracking-tight"
-            title="Back to landing"
+            title="Dashboard"
           >
             <span className="shrink-0 text-accent" aria-hidden>
               /

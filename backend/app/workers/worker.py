@@ -1,8 +1,8 @@
 from rq import SimpleWorker
-from redis import Redis
 
-redis_conn = Redis(host="localhost", port=6379)
+from app.queue.redis import redis_conn
 
 worker = SimpleWorker(["default"], connection=redis_conn)
 
-worker.work()
+if __name__ == "__main__":
+    worker.work()

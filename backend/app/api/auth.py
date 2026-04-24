@@ -93,6 +93,17 @@ async def github_callback(
     }
     jwt_token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
-    return RedirectResponse(
-        f"{settings.frontend_url}/dashboard?token={jwt_token}"
+    redirect_url = f"{settings.frontend_url.rstrip('/')}/dashboard?token={jwt_token}"
+    response = RedirectResponse(redirect_url, status_code=302)
+    # Mirror JWT for Next.js middleware (must match `JWT_SECRET` in the client app).
+    _secure = str(settings.frontend_url).lower().startswith("https://")
+    response.set_cookie(
+        key="app_token",
+        value=jwt_token,
+        max_age=60 * 60 * 24 * 7,
+        path="/",
+        samesite="lax",
+        secure=_secure,
+        httponly=False,
     )
+    return response

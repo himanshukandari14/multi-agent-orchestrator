@@ -88,3 +88,27 @@ body {
     animation: none;
   }
 }
+
+/* Landing: hero lines */
+@keyframes landing-hero-t {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-hero-t {
+  animation: landing-hero-t 0.75s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-t {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

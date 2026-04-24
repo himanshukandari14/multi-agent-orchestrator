@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ProfilePageSkeleton } from "@/components/skeletons/presets";
+import { clearSessionCookie } from "@/lib/sessionCookie";
 
 function useHasSession() {
   const [hasToken, setHasToken] = useState<boolean | null>(null);
@@ -25,6 +26,7 @@ export default function ProfilePage() {
     } catch {
       // ignore
     }
+    clearSessionCookie();
     router.push("/");
     router.refresh();
   };

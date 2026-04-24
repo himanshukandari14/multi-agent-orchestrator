@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { clearSessionCookie } from "@/lib/sessionCookie";
 
 function IconUser({ className }: { className?: string }) {
   return (
@@ -114,6 +115,7 @@ export function AccountMenu({ variant }: Props) {
     } catch {
       // ignore
     }
+    clearSessionCookie();
     setOpen(false);
     router.push("/");
     router.refresh();
