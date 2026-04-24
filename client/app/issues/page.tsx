@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { API_BASE } from "@/lib/api";
+import { IssueListSkeleton } from "@/components/skeletons/presets";
 
 type Issue = {
   id: number;
@@ -67,7 +68,7 @@ function IssuesList() {
   }
 
   if (loading) {
-    return <p className="text-sm text-muted">Loading…</p>;
+    return <IssueListSkeleton rows={5} />;
   }
 
   if (issues.length === 0) {
@@ -91,10 +92,6 @@ function IssuesList() {
   );
 }
 
-function IssuesFallback() {
-  return <p className="text-sm text-muted">Loading…</p>;
-}
-
 export default function IssuesPage() {
   return (
     <div className="space-y-8">
@@ -106,7 +103,7 @@ export default function IssuesPage() {
           Read-only list from the API. Use the dashboard to run fixes.
         </p>
       </header>
-      <Suspense fallback={<IssuesFallback />}>
+      <Suspense fallback={<IssueListSkeleton rows={4} />}>
         <IssuesList />
       </Suspense>
     </div>

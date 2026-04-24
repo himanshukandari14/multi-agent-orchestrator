@@ -16,7 +16,7 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 
 @router.get("/auth/github/login")
 def github_login():
-    url = f"https://github.com/login/oauth/authorize?client_id={CLIENT_ID}&scope=repo user"
+    url = f"https://github.com/login/oauth/authorize?client_id={CLIENT_ID}&scope=repo"
     return RedirectResponse(url)
 
 

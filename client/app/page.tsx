@@ -3,8 +3,22 @@ import { API_BASE } from "@/lib/api";
 
 export default function Home() {
   return (
-    <div className="space-y-12">
-      <div className="max-w-lg space-y-6">
+    <div className="flex min-h-dvh flex-col bg-background px-5 py-12 sm:px-8 sm:py-16">
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <span className="font-heading text-[17px] font-semibold tracking-tight">
+          <span className="text-accent" aria-hidden>
+            /
+          </span>
+          <span className="text-foreground">fixer</span>
+        </span>
+        <a
+          href={`${API_BASE}/auth/github/login`}
+          className="text-[13px] text-muted transition hover:text-foreground"
+        >
+          Sign in
+        </a>
+      </div>
+      <div className="max-w-lg flex-1 space-y-6">
         <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-accent">
           Orchestrate
         </p>

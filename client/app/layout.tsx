@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Outfit } from "next/font/google";
-import { AppShell } from "@/components/AppShell";
+import { AppRoot } from "@/components/AppRoot";
+import { AppSkeletonTheme } from "@/components/skeletons/AppSkeletonTheme";
+import { JobQueueProvider } from "@/context/JobQueueContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -33,8 +35,12 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <AppShell>{children}</AppShell>
+      <body className="min-h-dvh flex max-w-full flex-col bg-background text-foreground">
+        <JobQueueProvider>
+          <AppSkeletonTheme>
+            <AppRoot>{children}</AppRoot>
+          </AppSkeletonTheme>
+        </JobQueueProvider>
       </body>
     </html>
   );

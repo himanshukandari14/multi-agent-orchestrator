@@ -11,8 +11,13 @@ def run_job(data):
     issue = data["issue"]
 
     from rq import get_current_job
-    job = get_current_job()
-    job_id = job.id
+    rq = get_current_job()
+    # Prefer the client-facing id (from /fix) so status polling uses the same key as Redis
+    job_id = data.get("job_id")
+    if not job_id and rq is not None:
+        job_id = str(rq.id)
+    if not job_id:
+        raise ValueError("run_job: missing job_id")
 
     job_dir = f"/tmp/job_{job_id}"
 

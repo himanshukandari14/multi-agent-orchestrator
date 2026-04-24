@@ -1,309 +1,318 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { ComponentType } from "react";
 import Link from "next/link";
-import { API_BASE } from "@/lib/api";
+import { useJobQueue } from "@/context/JobQueueContext";
+import { useCaptureOAuthToken } from "@/hooks/useCaptureOAuthToken";
 
-type GitHubOwner = { login: string };
+/** Placeholder until analytics / DB; swap for real aggregates. */
+const HARDCODED_METRICS = {
+  lifetimeFixesCompleted: 47,
+  successRatePct: 94,
+  failedRuns: 3,
+  medianTimeToPr: "4m 12s",
+} as const;
 
-type Repo = {
-  id: number;
-  name: string;
-  clone_url: string;
-  owner: GitHubOwner;
-};
-
-type Issue = {
-  id: number;
-  title: string;
-};
-
-type JobResult = { pr_url?: string; error?: string };
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function IconCheckCircle({ className }: { className?: string }) {
   return (
-    <h2 className="mb-3 font-heading text-lg font-semibold tracking-tight text-foreground">
-      {children}
-    </h2>
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M8.5 12.2 11 14.7l4.4-4.3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconPercent({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M6 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm12 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M18 5 6 20"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconAlert({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 8v4m0 4h.01M4.4 20h15.2a.8.8 0 0 0 .7-1.2l-7.6-12.3a.8.8 0 0 0-1.4 0L3.7 18.8a.8.8 0 0 0 .7 1.2Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconClock({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 7v5l2.5 1.5M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconPulse({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 10v4M9.5 6v12M14 3v18M18.5 8v8"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconSession({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 5h3l2 2h4l2-2h3M4 5v3h16V5M4 5v9a2 2 0 0 0 2 2h1m-3-6h4m-4 4h2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconArrowRight({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 12h12m-4-4 4 4-4 4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+type StatIcon = ComponentType<{ className?: string }>;
+
+type StatConfig = {
+  label: string;
+  value: string;
+  hint?: string;
+  Icon: StatIcon;
+  delay: string;
+};
+
+function StatCard({
+  label,
+  value,
+  hint,
+  Icon,
+  delay,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  Icon: StatIcon;
+  delay: string;
+}) {
+  return (
+    <div
+      className="stat-card-entrance group relative flex min-h-0 flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-surface-elevated/50 p-4 transition-colors duration-200 hover:border-accent/20 hover:bg-surface-elevated/70 sm:p-5"
+      style={{ animationDelay: delay }}
+    >
+      <div className="relative flex items-start justify-between gap-3">
+        <p className="text-[11px] font-medium uppercase tracking-widest text-muted">
+          {label}
+        </p>
+        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border/80 bg-surface/80 text-accent transition-transform duration-200 group-hover:scale-[1.02] group-hover:border-accent/25">
+          <Icon className="h-[17px] w-[17px]" />
+        </span>
+      </div>
+      <p className="relative mt-3 font-mono text-2xl font-semibold tabular-nums text-foreground sm:text-3xl">
+        {value}
+      </p>
+      {hint && (
+        <p className="relative mt-2 text-xs leading-relaxed text-muted">
+          {hint}
+        </p>
+      )}
+    </div>
   );
 }
 
 export default function Dashboard() {
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [issues, setIssues] = useState<Issue[]>([]);
-  const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [issuesError, setIssuesError] = useState<string | null>(null);
-  const [issuesLoading, setIssuesLoading] = useState(false);
-  const issuesPanelRef = useRef<HTMLElement>(null);
+  useCaptureOAuthToken();
+  const { activeCount, jobs } = useJobQueue();
+  const completedInSession = jobs.filter((j) => j.status === "completed")
+    .length;
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-
-    if (token) {
-      localStorage.setItem("token", token);
-      window.history.replaceState({}, document.title, "/dashboard");
-    }
-
-    const storedToken = localStorage.getItem("token");
-    if (!storedToken) {
-      setLoadError("Not signed in. Use GitHub login from the home page.");
-      return;
-    }
-
-    fetch(`${API_BASE}/repos`, {
-      headers: { Authorization: `Bearer ${storedToken}` },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error("Could not load repositories.");
-        return res.json();
-      })
-      .then((data) => {
-        setRepos(data);
-        setLoadError(null);
-      })
-      .catch(() => setLoadError("Could not load repositories."));
-  }, []);
-
-  const loadIssues = (repo: Repo) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    setSelectedRepo(repo);
-    setIssues([]);
-    setIssuesError(null);
-    setIssuesLoading(true);
-
-    fetch(
-      `${API_BASE}/repos/${repo.owner.login}/${repo.name}/issues`,
-      { headers: { Authorization: `Bearer ${token}` } },
-    )
-      .then((res) => {
-        if (!res.ok) {
-          return res.json().then((body) => {
-            const msg =
-              typeof body === "object" && body && "message" in body
-                ? String((body as { message?: string }).message)
-                : "Request failed";
-            throw new Error(msg);
-          });
-        }
-        return res.json();
-      })
-      .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setIssues(
-          list.filter(
-            (item: { pull_request?: unknown; id: number; title: string }) =>
-              item != null && !item.pull_request,
-          ) as Issue[],
-        );
-        setIssuesError(null);
-        requestAnimationFrame(() => {
-          issuesPanelRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "nearest",
-          });
-        });
-      })
-      .catch((e: Error) => {
-        setIssuesError(e.message || "Could not load issues.");
-        setIssues([]);
-      })
-      .finally(() => setIssuesLoading(false));
-  };
-
-  const fixIssue = useCallback(
-    async (issue: Issue) => {
-      const token = localStorage.getItem("token");
-      if (!token || !selectedRepo) return;
-
-      const res = await fetch(`${API_BASE}/fix`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          repo_url: selectedRepo.clone_url,
-          issue: issue.title,
-        }),
-      });
-
-      const data = await res.json();
-      const jobId = data.job_id as string | undefined;
-      if (!jobId) {
-        alert("Could not start fix.");
-        return;
-      }
-
-      const interval = setInterval(async () => {
-        const jobRes = await fetch(`${API_BASE}/jobs/${jobId}`);
-        const job = (await jobRes.json()) as {
-          status: string;
-          result?: JobResult;
-        };
-
-        if (job.status === "completed") {
-          clearInterval(interval);
-          const url = job.result?.pr_url;
-          alert(url ? `PR created: ${url}` : "Completed.");
-        }
-
-        if (job.status === "failed") {
-          clearInterval(interval);
-          const err = job.result?.error ?? "Unknown error";
-          alert(`Failed: ${err}`);
-        }
-      }, 3000);
+  const staticStats: StatConfig[] = [
+    {
+      label: "Lifetime fixes (completed)",
+      value: String(HARDCODED_METRICS.lifetimeFixesCompleted),
+      hint: "All-time successful runs (illustrative)",
+      Icon: IconCheckCircle,
+      delay: "0ms",
     },
-    [selectedRepo],
-  );
-
-  const issuesBlock = (
-    <section
-      ref={issuesPanelRef}
-      aria-labelledby="issues-heading"
-      className="min-w-0 rounded-lg border border-border bg-surface-elevated/40 p-4 sm:p-5"
-    >
-      <SectionTitle>
-        <span id="issues-heading">Issues to fix</span>
-      </SectionTitle>
-      <p className="mb-4 text-pretty text-sm text-muted">
-        <span className="text-foreground">Load issues</span> on a repository,
-        then <span className="text-foreground">Run fix</span> for an open
-        issue.
-      </p>
-
-      {issuesError && (
-        <p className="mb-3 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-danger">
-          {issuesError}
-        </p>
-      )}
-
-      {selectedRepo && (
-        <p
-          className="mb-3 wrap-break-word font-mono text-sm leading-relaxed text-foreground"
-          title={`${selectedRepo.owner.login}/${selectedRepo.name}`}
-        >
-          {selectedRepo.owner.login}/{selectedRepo.name}
-        </p>
-      )}
-      {!selectedRepo && !issuesLoading && (
-        <p className="text-sm text-muted">No repository selected yet.</p>
-      )}
-      {issuesLoading && (
-        <p className="text-sm text-muted">Loading issues…</p>
-      )}
-      {selectedRepo && !issuesLoading && issues.length > 0 && (
-        <ul className="space-y-2.5">
-          {issues.map((issue) => (
-            <li
-              key={issue.id}
-              className="flex flex-col gap-2.5 rounded-md border border-border bg-surface px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-            >
-              <p className="min-w-0 flex-1 text-pretty text-sm leading-snug text-foreground">
-                {issue.title}
-              </p>
-              <button
-                type="button"
-                onClick={() => fixIssue(issue)}
-                className="min-h-10 w-full shrink-0 rounded-md bg-accent px-4 text-sm font-medium text-white transition hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:min-w-30 sm:w-auto disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!selectedRepo}
-              >
-                Run fix
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {selectedRepo &&
-        !issuesLoading &&
-        issues.length === 0 &&
-        !issuesError && (
-          <p className="text-sm text-muted">
-            No open issues in this repository. Open an issue on GitHub, then
-            load again.
-          </p>
-        )}
-    </section>
-  );
+    {
+      label: "Success rate",
+      value: `${HARDCODED_METRICS.successRatePct}%`,
+      hint: "Last 30d rolling (illustrative)",
+      Icon: IconPercent,
+      delay: "40ms",
+    },
+    {
+      label: "Failed runs",
+      value: String(HARDCODED_METRICS.failedRuns),
+      hint: "Requires manual follow-up (illustrative)",
+      Icon: IconAlert,
+      delay: "80ms",
+    },
+    {
+      label: "Median time to PR",
+      value: HARDCODED_METRICS.medianTimeToPr,
+      hint: "Queue to open PR (illustrative)",
+      Icon: IconClock,
+      delay: "120ms",
+    },
+    {
+      label: "Active in queue",
+      value: String(activeCount),
+      hint: "Jobs queued, running, or waiting",
+      Icon: IconPulse,
+      delay: "160ms",
+    },
+    {
+      label: "Completed (this session)",
+      value: String(completedInSession),
+      hint: "Finished jobs in this tab since load",
+      Icon: IconSession,
+      delay: "200ms",
+    },
+  ];
 
   return (
     <div className="space-y-8">
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm text-muted">
-          Repositories and open issues for the signed-in account.
-        </p>
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="min-w-0 space-y-1">
+          <p className="text-xs font-medium uppercase tracking-widest text-muted">
+            Overview
+          </p>
+          <h1 className="font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
+            Dashboard
+          </h1>
+          <p className="text-sm text-muted">
+            Health of your fix pipeline. Open{" "}
+            <Link
+              href="/repos"
+              className="text-foreground underline decoration-border underline-offset-4 transition hover:text-accent"
+            >
+              Repositories
+            </Link>{" "}
+            to run new jobs.
+          </p>
+        </div>
+        <div className="shrink-0 sm:self-center sm:pt-1">
+          <Link
+            href="/repos"
+            className="group inline-flex min-h-11 w-full min-w-44 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-white shadow-sm transition hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:w-auto"
+          >
+            Run a fix
+            <IconArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+          </Link>
+        </div>
       </header>
 
-      {loadError && (
-        <p className="rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-danger">
-          {loadError}
-        </p>
-      )}
+      <p className="rounded-md border border-border/50 bg-surface-elevated/40 px-3 py-2 text-xs text-muted">
+        Sample values below until a database is connected. Queue counts use this
+        session’s Activity state.
+      </p>
 
-      <div className="grid min-w-0 grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] xl:items-start">
-        <section aria-labelledby="repos-heading" className="min-w-0">
-          <SectionTitle>
-            <span id="repos-heading">Repositories</span>
-          </SectionTitle>
-          {repos.length === 0 && !loadError && (
-            <p className="text-sm text-muted">No repositories yet.</p>
-          )}
-          <ul className="overflow-hidden rounded-lg border border-border bg-surface">
-            {repos.map((repo) => {
-              const isSelected = selectedRepo?.id === repo.id;
-              return (
-                <li
-                  key={repo.id}
-                  className={[
-                    "min-w-0 border-b border-border px-4 py-4 last:border-b-0",
-                    "flex flex-col gap-3 transition-colors",
-                    isSelected
-                      ? "bg-surface-elevated ring-1 ring-inset ring-accent/25"
-                      : "hover:bg-surface-elevated/50",
-                  ].join(" ")}
-                >
-                  <div className="min-w-0">
-                    <p
-                      className="font-mono text-sm leading-normal text-foreground wrap-anywhere sm:leading-relaxed"
-                      title={`${repo.owner.login}/${repo.name}`}
-                    >
-                      {repo.owner.login}/{repo.name}
-                    </p>
-                    {isSelected && (
-                      <p className="mt-1.5 text-xs font-medium uppercase tracking-wide text-accent">
-                        Active
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => loadIssues(repo)}
-                      className="min-h-10 min-w-30 flex-1 rounded-md border border-border bg-surface-elevated px-3 text-sm text-foreground transition hover:border-accent/40 hover:text-accent sm:flex-initial"
-                    >
-                      Load issues
-                    </button>
-                    <Link
-                      href={`/issues?owner=${encodeURIComponent(repo.owner.login)}&repo=${encodeURIComponent(repo.name)}`}
-                      className="inline-flex min-h-10 min-w-30 flex-1 items-center justify-center rounded-md border border-border bg-transparent px-3 text-sm text-muted transition hover:border-border hover:text-foreground sm:flex-initial"
-                    >
-                      Issues view
-                    </Link>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+      <section aria-labelledby="metrics-heading" className="space-y-3">
+        <h2
+          id="metrics-heading"
+          className="font-heading text-lg font-semibold tracking-tight text-foreground"
+        >
+          Fix metrics
+        </h2>
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {staticStats.map((s) => (
+            <StatCard
+              key={s.label}
+              label={s.label}
+              value={s.value}
+              hint={s.hint}
+              Icon={s.Icon}
+              delay={s.delay}
+            />
+          ))}
+        </div>
+      </section>
 
-        {issuesBlock}
-      </div>
+      <section
+        className="relative overflow-hidden rounded-xl border border-accent/25 bg-linear-to-br from-accent/30 via-background to-black p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-6"
+        aria-label="Get started"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_60%_at_100%_0%,rgba(225,29,72,0.18),transparent_55%)]"
+          aria-hidden
+        />
+        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">
+              Work queue
+            </p>
+            <p className="mt-1 font-heading text-lg font-semibold text-foreground">
+              Pick a repo, load issues, queue a fix
+            </p>
+            <p className="mt-1 text-sm text-zinc-400">
+              Jobs stream to Activity — no refresh needed.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap gap-2 sm:flex-nowrap">
+            <Link
+              href="/repos"
+              className="inline-flex min-h-10 min-w-36 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium text-white shadow-sm transition hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              Repositories
+              <IconArrowRight className="h-4 w-4 text-white" />
+            </Link>
+            <Link
+              href="/queue"
+              className="inline-flex min-h-10 min-w-28 items-center justify-center rounded-md border border-white/20 bg-white px-4 text-sm font-medium text-background transition hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              Open Activity
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
