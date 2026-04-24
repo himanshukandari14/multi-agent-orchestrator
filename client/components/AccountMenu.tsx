@@ -18,6 +18,23 @@ function IconUser({ className }: { className?: string }) {
   );
 }
 
+function IconCard({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x="2.5"
+        y="5"
+        width="19"
+        height="14.5"
+        rx="2.2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path d="M2.5 10.25h19" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function IconLogOut({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -69,6 +86,7 @@ export function AccountMenu({ variant }: Props) {
   const pathname = usePathname();
   const listId = useId();
   const profileActive = pathname === "/profile" || pathname.startsWith("/profile/");
+  const billingActive = pathname === "/billing" || pathname.startsWith("/billing/");
 
   useEffect(() => {
     function handlePointer(e: PointerEvent) {
@@ -155,6 +173,21 @@ export function AccountMenu({ variant }: Props) {
           >
             <IconUser className="h-4 w-4 text-muted" />
             Profile
+          </Link>
+          <Link
+            role="menuitem"
+            href="/billing"
+            onClick={() => setOpen(false)}
+            className={[
+              "flex items-center gap-2 px-2.5 py-2 text-[13px] font-medium transition-colors",
+              "focus:bg-surface-elevated/80 focus:outline-none",
+              billingActive
+                ? "bg-surface-elevated text-accent"
+                : "text-foreground hover:bg-surface-elevated/50",
+            ].join(" ")}
+          >
+            <IconCard className="h-4 w-4 text-muted" />
+            Billing
           </Link>
           <div className="mx-1 my-0.5 h-px bg-border" role="separator" />
           <button

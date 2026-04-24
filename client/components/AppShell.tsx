@@ -10,6 +10,7 @@ const mainNav = [
   { href: "/repos", label: "Repos", icon: IconRepos },
   { href: "/queue", label: "Activity", icon: IconActivity },
   { href: "/analytics", label: "Analytics", icon: IconAnalytics },
+  { href: "/billing", label: "Billing", icon: IconBilling },
   { href: "/knowledge", label: "Knowledge", icon: IconKnowledge },
 ] as const;
 
@@ -104,6 +105,33 @@ function IconAnalytics({ className }: { className?: string }) {
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconBilling({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect
+        x="2.5"
+        y="5"
+        width="19"
+        height="14.5"
+        rx="2.2"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M2.5 10.25h19"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M6.5 16.5h3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
       />
     </svg>
   );

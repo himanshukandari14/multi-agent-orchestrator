@@ -1,30 +1,46 @@
-from fastapi.responses import RedirectResponse
-import httpx
-from fastapi import APIRouter
-import os
-from dotenv import load_dotenv
-from jose import jwt
-load_dotenv()
+from __future__ import annotations
 
+import os
+
+import httpx
+from dotenv import load_dotenv
+from fastapi import APIRouter, Depends
+from fastapi.responses import RedirectResponse
+from jose import jwt
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.db.session import get_db
+from app.services.users import get_or_create_user_from_github
+
+load_dotenv()
 
 router = APIRouter()
 
 CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-JWT_SECRET = os.getenv("JWT_SECRET")
 
 
 @router.get("/auth/github/login")
-def github_login():
-    url = f"https://github.com/login/oauth/authorize?client_id={CLIENT_ID}&scope=repo"
+def github_login() -> RedirectResponse:
+    if not CLIENT_ID:
+        raise RuntimeError("GITHUB_CLIENT_ID is not set")
+    url = (
+        "https://github.com/login/oauth/authorize"
+        f"?client_id={CLIENT_ID}&scope=repo%20user:email"
+    )
     return RedirectResponse(url)
 
 
-# github callback
 @router.get("/auth/github/callback")
-async def github_callback(code: str):
+async def github_callback(
+    code: str,
+    db: Session = Depends(get_db),
+) -> RedirectResponse:
+    if not CLIENT_ID or not CLIENT_SECRET:
+        raise RuntimeError("GitHub OAuth env vars are not set")
 
-    # STEP A: Exchange code → access_token
+    settings = get_settings()
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             "https://github.com/login/oauth/access_token",
@@ -35,31 +51,48 @@ async def github_callback(code: str):
                 "code": code,
             },
         )
+        token_data = token_res.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            return RedirectResponse(
+                f"{settings.frontend_url}/?error=github_token"
+            )
 
-    token_data = token_res.json()
-    access_token = token_data.get("access_token")
-
-    # STEP B: Get user info
-    async with httpx.AsyncClient() as client:
         user_res = await client.get(
             "https://api.github.com/user",
-            headers={"Authorization": f"Bearer {access_token}"}
+            headers={"Authorization": f"Bearer {access_token}"},
         )
+        user_res.raise_for_status()
+        gh = user_res.json()
 
-    user = user_res.json()
+    email = gh.get("email")
+    if not email:
+        async with httpx.AsyncClient() as client:
+            em_res = await client.get(
+                "https://api.github.com/user/emails",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            if em_res.is_success:
+                for row in em_res.json():
+                    if row.get("primary") and row.get("email"):
+                        email = row["email"]
+                        break
 
-    # STEP C: Create JWT
+    app_user = get_or_create_user_from_github(
+        db,
+        github_id=int(gh["id"]),
+        login=gh["login"],
+        email=email,
+    )
+
     payload = {
-        "user_id": user["id"],
-        "username": user["login"],
-        "github_token": access_token
+        "user_id": str(app_user.id),
+        "github_id": app_user.github_id,
+        "username": app_user.github_login,
+        "github_token": access_token,
     }
+    jwt_token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
-    jwt_token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-
-    # STEP D: Redirect to frontend
-    return RedirectResponse(f"http://localhost:3000/dashboard?token={jwt_token}")
-
-
-
-
+    return RedirectResponse(
+        f"{settings.frontend_url}/dashboard?token={jwt_token}"
+    )
