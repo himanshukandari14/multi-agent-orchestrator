@@ -10,7 +10,6 @@ def run_job(data):
     repo_url = data["repo_url"]
     issue = data["issue"]
 
-    # 🔥 use RQ job id (VERY IMPORTANT)
     from rq import get_current_job
     job = get_current_job()
     job_id = job.id
@@ -28,16 +27,17 @@ def run_job(data):
         logger = logging.getLogger(__name__)
         logger.info("Cloning repo...")
 
+        update_job(job_id, progress=30, message="Cloning repo...")
+
         subprocess.run(
             ["git", "clone", "--depth", "1", repo_url, job_dir],
             check=True
         )
 
-        update_job(job_id, progress=40)
-
         os.chdir(job_dir)
 
         print("🧠 Running AI agents...")
+        update_job(job_id, progress=60, message="Running AI agents...")
 
         graph = build_graph()
 
@@ -51,9 +51,9 @@ def run_job(data):
             "pr_url": None,
         })
 
-        update_job(job_id, progress=80)
+        update_job(job_id, progress=80, message="Finalizing PR...")
 
-        # save outputs
+        # save outputs (optional debug)
         if result.get("patch"):
             with open("output_patch.txt", "w") as f:
                 f.write(result["patch"])
@@ -66,13 +66,21 @@ def run_job(data):
             job_id,
             status="completed",
             progress=100,
-            result=result
+            result={
+                "pr_url": result.get("pr_url"),
+                "message": "PR created successfully"
+            }
         )
 
         print("✅ Job completed")
         return result
 
     except Exception as e:
-        update_job(job_id, status="failed", error=str(e))
+        update_job(
+            job_id,
+            status="failed",
+            progress=100,
+            result={"error": str(e)}
+        )
         print("\n❌ JOB FAILED:", str(e))
         return {"error": str(e)}
