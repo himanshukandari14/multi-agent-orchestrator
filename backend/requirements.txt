@@ -39,7 +39,6 @@ Jinja2==3.1.6
 jiter==0.13.0
 kiwisolver==1.4.9
 # Editable install with no version control (library==0.0.0)
--e /Users/himanshukandari/Desktop/sd-scripts
 lion-pytorch==0.2.3
 Markdown==3.10.2
 markdown-it-py==4.0.0
