@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Outfit } from "next/font/google";
+import { Geist, Geist_Mono, Outfit, Caveat } from "next/font/google";
 import { AppRoot } from "@/components/AppRoot";
 import { AppSkeletonTheme } from "@/components/skeletons/AppSkeletonTheme";
 import { JobQueueProvider } from "@/context/JobQueueContext";
@@ -20,8 +20,13 @@ const outfit = Outfit({
   subsets: ["latin"],
 });
 
+const caveat = Caveat({
+  variable: "--font-handwriting",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
-  title: "AI GitHub Fixer",
+  title: "PatchPilot",
   description: "Automated issue fixes from your GitHub repos",
 };
 
@@ -33,7 +38,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} ${caveat.variable} h-full antialiased`}
     >
       <body className="min-h-dvh flex max-w-full flex-col bg-background text-foreground">
         <JobQueueProvider>

@@ -289,13 +289,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
           <Link
             href="/dashboard"
-            className="group flex min-w-0 items-baseline gap-0.5 font-heading text-[16px] font-semibold tracking-tight"
+            className="group flex min-w-0 items-center gap-2.5 font-heading text-[16px] font-bold tracking-tight"
             title="Dashboard"
           >
-            <span className="shrink-0 text-accent" aria-hidden>
-              /
-            </span>
-            <span className="text-foreground">fixer</span>
+            <img src="/logo.svg" alt="PatchPilot" className="h-6 w-auto" />
+            <span className="text-foreground">PatchPilot</span>
           </Link>
         </div>
         <p className="px-4 pb-2 pt-2.5 text-[11px] font-medium uppercase tracking-widest text-muted">
@@ -339,7 +337,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto w-full max-w-[min(100%,90rem)]">{children}</div>
         </main>
         <footer className="shrink-0 border-t border-border py-4 text-center text-[11px] text-muted/90">
-          AI GitHub Fixer
+          PatchPilot
         </footer>
       </div>
     </div>
