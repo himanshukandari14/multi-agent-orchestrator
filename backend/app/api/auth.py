@@ -28,7 +28,6 @@ def github_login() -> RedirectResponse:
     url = (
         "https://github.com/login/oauth/authorize"
         f"?client_id={CLIENT_ID}&scope=repo%20user:email%20admin:repo_hook"
-        "&prompt=consent"
     )
     return RedirectResponse(url)
 
