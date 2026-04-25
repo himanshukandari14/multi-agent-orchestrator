@@ -30,7 +30,11 @@ function cookieOpts(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
-  if (isNextInternal(pathname) || isPublicStaticFile(pathname)) {
+  if (
+    isNextInternal(pathname) ||
+    isPublicStaticFile(pathname) ||
+    pathname.includes("/auth/github/callback")
+  ) {
     return NextResponse.next();
   }
 
