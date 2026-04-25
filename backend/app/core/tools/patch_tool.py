@@ -2,14 +2,18 @@ import os
 import re
 import subprocess
 
-_HUNK_HEADER = re.compile(
-    r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$"
-)
+def parse_hunk_header(line: str) -> tuple[int, int, str]:
+    m_rest = re.match(r"^@@.*?@@(.*)$", line)
+    rest = m_rest.group(1) if m_rest else ""
+    m_nums = re.search(r"-(\d+).*?\+(\d+)", line)
+    old_start = int(m_nums.group(1)) if m_nums else 1
+    new_start = int(m_nums.group(2)) if m_nums else 1
+    return old_start, new_start, rest
 
 
 def _is_hunk_body_line(line: str) -> bool:
     if not line:
-        return False
+        return True
     return line[0] in " +-\\"
 
 
@@ -18,6 +22,8 @@ def _count_hunk_lines(body: list[str]) -> tuple[int, int]:
     old_n, new_n = 0, 0
     for line in body:
         if not line:
+            old_n += 1
+            new_n += 1
             continue
         c = line[0]
         if c == " ":
@@ -47,22 +53,19 @@ def repair_unified_diff_hunks(patch: str) -> str:
     n = len(lines)
     while i < n:
         line = lines[i]
-        m = _HUNK_HEADER.match(line)
-        if not m:
+        if not line.startswith("@@"):
             out.append(line)
             i += 1
             continue
 
-        old_start = int(m.group(1))
-        new_start = int(m.group(3))
-        rest = m.group(5) or ""
+        old_start, new_start, rest = parse_hunk_header(line)
 
         j = i + 1
         while j < n:
             bl = lines[j]
             if bl.startswith("diff --git"):
                 break
-            if _HUNK_HEADER.match(bl):
+            if bl.startswith("@@"):
                 break
             if _is_hunk_body_line(bl):
                 j += 1
@@ -70,10 +73,15 @@ def repair_unified_diff_hunks(patch: str) -> str:
             break
 
         body = lines[i + 1 : j]
+        # remove trailing empty lines from body to avoid swallowing file-separating newlines
+        while body and not body[-1]:
+            body.pop()
+            j -= 1
+
         old_cnt, new_cnt = _count_hunk_lines(body)
         new_header = f"@@ -{old_start},{old_cnt} +{new_start},{new_cnt} @@{rest}"
         out.append(new_header)
-        out.extend(body)
+        out.extend([" " if not line else line for line in body])
         i = j
 
     return "\n".join(out)
@@ -108,6 +116,8 @@ def apply_patch(patch: str):
                 "git",
                 "apply",
                 "--recount",
+                "--ignore-whitespace",
+                "--unidiff-zero",
                 "--whitespace=fix",
                 "temp.patch",
             ],
