@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from typing import Any
-
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
+from app.queue.redis import redis_conn
+
 
 from app.api.deps import get_billing_user
 from app.db.models import Plan, Subscription, User
@@ -25,6 +27,13 @@ class CheckoutBody(BaseModel):
 
 @router.get("/plans")
 def list_plans(db: Session = Depends(get_db)) -> dict[str, Any]:
+    cache_key = "billing:plans"
+
+    # cache hit
+    cached = redis_conn.get(cache_key)
+    if cached:
+        print("cached hit: plans")
+        return json.loads(cached)
     rows = (
         db.execute(
             select(Plan)
@@ -34,7 +43,7 @@ def list_plans(db: Session = Depends(get_db)) -> dict[str, Any]:
         .scalars()
         .all()
     )
-    return {
+    data = {
         "plans": [
             {
                 "slug": p.slug,
@@ -48,12 +57,23 @@ def list_plans(db: Session = Depends(get_db)) -> dict[str, Any]:
         ]
     }
 
+    redis_conn.setex(cache_key, 300, json.dumps(data))
+
+    return data
+
 
 @router.get("/me")
 def billing_me(
     db: Session = Depends(get_db),
     user: User = Depends(get_billing_user),
 ) -> dict[str, Any]:
+    cache_key = f"billing:me:{user.id}"
+
+    # CACHE HIT
+    cached = redis_conn.get(cache_key)
+    if cached:
+        print("⚡ CACHE HIT: billing_me")
+        return json.loads(cached)
     row = (
         db.execute(
             select(User)
@@ -69,7 +89,7 @@ def billing_me(
         raise HTTPException(status_code=404, detail="user not found")
     sub = row.subscription
     plan = sub.plan if sub else None
-    return {
+    data = {
         "user": {
             "id": str(row.id),
             "github_login": row.github_login,
@@ -98,6 +118,11 @@ def billing_me(
             }
         ),
     }
+
+    # STORE (TTL = 60 sec)
+    redis_conn.setex(cache_key, 60, json.dumps(data, default=str))
+
+    return data
 
 
 @router.post("/checkout")

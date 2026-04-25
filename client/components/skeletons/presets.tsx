@@ -170,3 +170,46 @@ export function ProfilePageSkeleton() {
     </div>
   );
 }
+
+export function BillingPageSkeleton() {
+  return (
+    <div className="space-y-8" aria-hidden>
+      <PageHeaderSkeleton showKicker />
+      
+      <section className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-xl border border-border/80 bg-surface-elevated/50 p-4 sm:p-5">
+            <Skeleton width={96} height={12} className="mb-4" />
+            <Skeleton width="60%" height={28} className="mb-2" />
+            <Skeleton width="80%" height={14} />
+          </div>
+        ))}
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-end justify-between gap-2">
+          <Skeleton width={80} height={24} />
+          <Skeleton width={60} height={16} />
+        </div>
+        <ul className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="flex min-h-0 flex-col justify-between overflow-hidden rounded-xl border border-border/80 bg-surface-elevated/50 p-5">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Skeleton width={32} height={32} borderRadius={6} />
+                  <Skeleton width={120} height={20} />
+                </div>
+                <Skeleton count={2} width="100%" height={14} className="mb-4" />
+                <Skeleton width="50%" height={32} className="mb-2" />
+                <Skeleton width="60%" height={12} />
+              </div>
+              <div className="mt-6">
+                <Skeleton width="100%" height={40} borderRadius={6} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}

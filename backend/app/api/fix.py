@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -54,7 +55,16 @@ def get_fix_metrics(
 ) -> dict[str, Any]:
     """Dashboard + analytics: real aggregates from `fix_jobs`."""
     uid = uuid.UUID(user["user_id"])
-    return get_user_fix_metrics(db, uid)
+    cache_key = f"fix_metrics:{uid}"
+
+    cached = redis_conn.get(cache_key)
+    if cached:
+        print("⚡ CACHE HIT: fix_metrics")
+        return json.loads(cached)
+
+    metrics = get_user_fix_metrics(db, uid)
+    redis_conn.setex(cache_key, 60, json.dumps(metrics))
+    return metrics
 
 
 @router.get("/fix/jobs")

@@ -13,7 +13,7 @@ import {
   type BillingMeResponse,
 } from "@/lib/billing";
 import { useCaptureOAuthToken } from "@/hooks/useCaptureOAuthToken";
-import { DashboardPageSkeleton } from "@/components/skeletons/presets";
+import { BillingPageSkeleton } from "@/components/skeletons/presets";
 
 function IconCoins({ className }: { className?: string }) {
   return (
@@ -116,7 +116,7 @@ function BillingContentInner() {
   }
 
   if (loading && plans.length === 0) {
-    return <DashboardPageSkeleton />;
+    return <BillingPageSkeleton />;
   }
 
   return (
@@ -362,7 +362,7 @@ function BillingContentInner() {
 
 function BillingWithSuspense() {
   return (
-    <Suspense fallback={<DashboardPageSkeleton />}>
+    <Suspense fallback={<BillingPageSkeleton />}>
       <BillingContentInner />
     </Suspense>
   );
