@@ -173,10 +173,12 @@ def pr_agent(state):
         )
 
     try:
+        _run_git(["git", "config", "user.name", "PatchPilot[bot]"])
+        _run_git(["git", "config", "user.email", "bot@patchpilot.app"])
         _run_git(["git", "checkout", "-B", branch_name])
         _run_git(["git", "add", "-A"])
         commit = _run_git(
-            ["git", "commit", "-m", "AI Patch Applied"],
+            ["git", "commit", "-m", "AI Fix (Auto Generated)\n\nSigned-off-by: PatchPilot <bot@patchpilot.app>"],
             check=False,
         )
         if commit.returncode != 0:

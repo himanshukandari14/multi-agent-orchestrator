@@ -27,7 +27,8 @@ def github_login() -> RedirectResponse:
         raise RuntimeError("GITHUB_CLIENT_ID is not set")
     url = (
         "https://github.com/login/oauth/authorize"
-        f"?client_id={CLIENT_ID}&scope=repo%20user:email"
+        f"?client_id={CLIENT_ID}&scope=repo%20user:email%20admin:repo_hook"
+        "&prompt=consent"
     )
     return RedirectResponse(url)
 

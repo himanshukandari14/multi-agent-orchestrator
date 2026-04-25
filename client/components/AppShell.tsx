@@ -16,6 +16,7 @@ const mainNav = [
   { href: "/queue", label: "Activity", icon: IconActivity },
   { href: "/analytics", label: "Analytics", icon: IconAnalytics },
   { href: "/billing", label: "Billing", icon: IconBilling },
+  { href: "/review", label: "Auto-Review", icon: IconCodeReview },
   { href: "/knowledge", label: "Knowledge", icon: IconKnowledge },
 ] as const;
 
@@ -161,6 +162,16 @@ function IconKnowledge({ className }: { className?: string }) {
   );
 }
 
+function IconCodeReview({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M14 3v4a1 1 0 0 0 1 1h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 15l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -283,7 +294,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Desktop sidebar */}
       <aside
-        className="relative hidden w-[230px] shrink-0 flex-col border-r border-border bg-[radial-gradient(120%_80%_at_0%_0%,rgba(225,29,72,0.12),transparent_55%)] lg:flex"
+        className="sticky top-0 hidden h-dvh w-[230px] shrink-0 flex-col overflow-y-auto border-r border-border bg-[radial-gradient(120%_80%_at_0%_0%,rgba(225,29,72,0.12),transparent_55%)] lg:flex"
         aria-label="App navigation"
       >
         <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
@@ -324,7 +335,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header
           className="hidden h-14 shrink-0 items-center border-b border-border bg-background/50 px-4 text-[11px] text-muted backdrop-blur-sm sm:flex lg:px-8"
           aria-label="App context"
@@ -333,7 +344,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             Multi-agent issue fixes from GitHub
           </p>
         </header>
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden px-3 py-5 sm:px-5 sm:py-6 lg:px-8">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-5 sm:px-5 sm:py-6 lg:px-8">
           <div className="mx-auto w-full max-w-[min(100%,90rem)]">{children}</div>
         </main>
         <footer className="shrink-0 border-t border-border py-4 text-center text-[11px] text-muted/90">

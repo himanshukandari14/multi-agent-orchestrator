@@ -13,6 +13,8 @@ from app.api.repos import router as repo_router
 from app.api.routes import router as job_router
 from app.api.status import router as status_router
 from app.api.webhooks_dodo import router as webhooks_dodo_router
+from app.api.webhooks import router as github_webhooks_router
+from app.api.review import router as review_router
 from app.db.init_db import create_tables
 from app.db.seed import ensure_plans
 from app.db.session import SessionLocal
@@ -46,6 +48,8 @@ app.include_router(issues_router)
 app.include_router(fix_router)
 app.include_router(billing_router)
 app.include_router(webhooks_dodo_router)
+app.include_router(github_webhooks_router)
+app.include_router(review_router)
 
 
 @app.get("/")
